@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ไร่อ้อยดิจิทัล — ตรวจสอบโรคและจัดสรรอ้อยจากภาพถ่าย3 AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-page: #E8EEE3;
+    --bg: #F7FAF4;
+    --surface: #FFFFFF;
+    --surface-2: #EEF3E9;
+    --ink: #16241A;
+    --ink-soft: #47563F;
+    --muted: #8A9682;
+    --line: #DEE7D6;
+    --primary: #1E7A48;
+    --primary-dark: #145233;
+    --primary-tint: #E1F1E5;
+    --accent: #C68A2E;
+    --accent-tint: #F7EAD3;
+    --danger: #B23A2E;
+    --danger-tint: #F6E1DD;
+    --focus: #1E6FB0;
+    --font-head: 'Kanit', 'Noto Sans Thai', sans-serif;
+    --font-body: 'Noto Sans Thai', sans-serif;
+    --radius-l: 20px;
+    --radius-m: 14px;
+    --radius-s: 8px;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg-page: #0E1410; --bg: #142019; --surface: #1B291F; --surface-2: #203024;
+      --ink: #E7F0E4; --ink-soft: #B7C6B2; --muted: #7C8B76; --line: #2C3B2F;
+      --primary: #4FAF75; --primary-dark: #7DC79A; --primary-tint: #1E3627;
+      --accent: #E0AC5E; --accent-tint: #3A2E1B; --danger: #E29184; --danger-tint: #3A231F;
+      --focus: #6FB2E8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg-page: #0E1410; --bg: #142019; --surface: #1B291F; --surface-2: #203024;
+    --ink: #E7F0E4; --ink-soft: #B7C6B2; --muted: #7C8B76; --line: #2C3B2F;
+    --primary: #4FAF75; --primary-dark: #7DC79A; --primary-tint: #1E3627;
+    --accent: #E0AC5E; --accent-tint: #3A2E1B; --danger: #E29184; --danger-tint: #3A231F;
+    --focus: #6FB2E8;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg-page); color: var(--ink); font-family: var(--font-body);
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3 { font-family: var(--font-head); margin: 0; color: var(--ink); }
+  p { margin: 0; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- phone frame ---- */
+  .stage { min-height: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 28px 12px; }
+  .phone {
+    width: 100%; max-width: 412px; background: var(--bg); min-height: calc(100vh - 56px);
+    border-radius: 28px; overflow: hidden; position: relative;
+    box-shadow: 0 1px 3px rgba(20,40,25,.08), 0 20px 44px rgba(20,40,25,.14);
+    display: flex; flex-direction: column;
+  }
+  @media (max-width: 460px) {
+    .stage { padding: 0; }
+    .phone { border-radius: 0; min-height: 100vh; box-shadow: none; max-width: none; }
+  }
+  .screen { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .pad { padding: 22px 20px 28px; }
+
+  /* ---- shared bits ---- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 13px 20px; border-radius: 999px; font-size: 15px; font-weight: 600;
+    border: 1px solid transparent; cursor: pointer; font-family: var(--font-head);
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-outline { background: transparent; color: var(--primary-dark); border-color: var(--primary); }
+  .btn-ghost { background: var(--surface-2); color: var(--ink-soft); }
+  .btn-block { width: 100%; }
+  .btn[disabled] { opacity: .5; cursor: not-allowed; }
+  .link-btn { background: none; border: none; color: var(--primary-dark); font-weight: 600; font-size: 14px; cursor: pointer; padding: 4px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; font-weight: 500; }
+  .field input { width: 100%; padding: 12px 14px; border-radius: var(--radius-s); border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 15px; font-family: inherit; }
+  .field input:focus { border-color: var(--primary); }
+  .field .err { font-size: 12px; color: var(--danger); margin-top: 5px; display: none; }
+  .field.has-error input { border-color: var(--danger); }
+  .field.has-error .err { display: block; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 10px; padding: 16px 16px 14px;
+    background: var(--bg); position: sticky; top: 0; z-index: 5;
+  }
+  .topbar .iconbtn { flex: none; }
+  .topbar h2 { font-size: 17px; flex: 1; text-align: center; margin-right: 34px; }
+  .topbar.left h2 { text-align: left; margin-right: 0; }
+  .iconbtn {
+    width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--surface-2);
+    color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .iconbtn:hover { background: var(--line); }
+
+  /* ---- bottom nav ---- */
+  .tabbar {
+    display: flex; border-top: 1px solid var(--line); background: var(--surface);
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .tabbar button {
+    flex: 1; background: none; border: none; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    color: var(--muted); font-size: 11px; padding: 4px 2px; cursor: pointer; font-family: var(--font-body); font-weight: 500;
+  }
+  .tabbar button.active { color: var(--primary); }
+  .tabbar svg { width: 22px; height: 22px; }
+
+  /* ---- splash ---- */
+  .splash { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 22px; }
+  .splash .mark {
+    width: 96px; height: 96px; border-radius: 28px; background: var(--primary-tint);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .splash h1 { font-size: 23px; line-height: 1.35; }
+  .splash p { color: var(--ink-soft); font-size: 14px; max-width: 30ch; }
+
+  /* ---- auth ---- */
+  .authhead { text-align: center; padding: 36px 24px 20px; }
+  .authhead .mark { width: 68px; height: 68px; border-radius: 20px; background: var(--primary-tint); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; margin: 16px 0; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+  /* ---- home ---- */
+  .greet { padding: 20px 20px 4px; }
+  .greet .hi { color: var(--muted); font-size: 13px; }
+  .greet h1 { font-size: 20px; margin-top: 2px; }
+  .banner {
+    margin: 16px 20px 4px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: var(--radius-l); padding: 22px 20px; color: #fff; position: relative; overflow: hidden;
+  }
+  .banner h3 { font-size: 17px; line-height: 1.4; max-width: 70%; font-family: var(--font-head); }
+  .banner p { font-size: 12.5px; opacity: .85; margin-top: 6px; max-width: 70%; }
+  .banner svg.leaf { position: absolute; right: -10px; bottom: -14px; width: 92px; height: 92px; opacity: .22; }
+  .quickgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 18px 20px 8px; }
+  .qcard {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m);
+    padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; text-align: left;
+  }
+  .qcard:hover { border-color: var(--primary); }
+  .qcard .ic { width: 38px; height: 38px; border-radius: 10px; background: var(--primary-tint); color: var(--primary-dark); display: flex; align-items: center; justify-content: center; }
+  .qcard span { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .sectionhead { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px 10px; }
+  .sectionhead h3 { font-size: 15px; }
+  .updatelist { padding: 0 20px 8px; display: flex; flex-direction: column; gap: 10px; }
+  .updateitem { display: flex; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 12px 14px; align-items: center; cursor: pointer; }
+  .updateitem .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+  .updateitem .txt { font-size: 13px; color: var(--ink-soft); flex: 1; }
+  .updateitem .txt b { color: var(--ink); font-weight: 600; }
+
+  /* ---- capture / scan ---- */
+  .capture-area {
+    margin: 18px 20px; aspect-ratio: 1; border-radius: var(--radius-l); background: var(--surface-2);
+    border: 1.5px dashed var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; overflow: hidden; position: relative;
+  }
+  .capture-area img { width: 100%; height: 100%; object-fit: cover; }
+  .capture-area .camicon { width: 74px; height: 74px; border-radius: 50%; background: var(--primary-tint); color: var(--primary-dark); display: flex; align-items: center; justify-content: center; }
+  .capture-area p { color: var(--muted); font-size: 13px; max-width: 70%; text-align: center; }
+  .guidebox { margin: 0 20px 18px; background: var(--accent-tint); border-radius: var(--radius-m); padding: 14px 16px; font-size: 12.5px; color: var(--ink-soft); }
+  .capture-actions { padding: 0 20px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .fileinput-wrap { position: relative; }
+  .fileinput-wrap input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .analyzing { text-align: center; padding: 60px 30px; }
+  .spinner { width: 46px; height: 46px; border-radius: 50%; border: 3.5px solid var(--surface-2); border-top-color: var(--primary); margin: 0 auto 20px; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- result ---- */
+  .resultphoto { margin: 16px 20px; border-radius: var(--radius-l); overflow: hidden; aspect-ratio: 16/11; background: var(--surface-2); }
+  .resultphoto img { width: 100%; height: 100%; object-fit: cover; }
+  .resultcard { margin: 0 20px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .resultcard .ic { width: 42px; height: 42px; border-radius: 10px; background: var(--danger-tint); color: var(--danger); display: flex; align-items: center; justify-content: center; flex: none; }
+  .resultcard.ok .ic { background: var(--primary-tint); color: var(--primary-dark); }
+  .resultcard h3 { font-size: 15.5px; }
+  .resultcard .conf { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .resultcard .conf b { color: var(--primary-dark); }
+  .detailblock { margin: 0 20px 16px; }
+  .detailblock h4 { font-size: 13.5px; color: var(--ink-soft); margin-bottom: 8px; }
+  .detailblock p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.7; }
+  .taglist { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 20px 18px; }
+  .tag { font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: var(--surface-2); color: var(--ink-soft); }
+
+  /* ---- history ---- */
+  .searchbar { margin: 6px 20px 14px; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 10px 15px; }
+  .searchbar svg { color: var(--muted); flex: none; }
+  .searchbar input { border: none; background: none; flex: 1; font-size: 14px; color: var(--ink); font-family: inherit; }
+  .searchbar input:focus { outline: none; }
+  .chiprow { display: flex; gap: 8px; padding: 0 20px 14px; overflow-x: auto; }
+  .chip { flex: none; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px; background: var(--surface-2); color: var(--ink-soft); border: 1px solid transparent; cursor: pointer; }
+  .chip.active { background: var(--primary); color: #fff; }
+  .histlist { padding: 0 20px; display: flex; flex-direction: column; }
+  .histitem { display: flex; gap: 12px; align-items: center; padding: 13px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .histitem .thumb { width: 46px; height: 46px; border-radius: 10px; background: var(--surface-2); flex: none; display: flex; align-items: center; justify-content: center; color: var(--muted); overflow: hidden; }
+  .histitem .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .histitem .mid { flex: 1; min-width: 0; }
+  .histitem .mid .name { font-size: 14px; font-weight: 600; }
+  .histitem .mid .date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .histitem .chev { color: var(--muted); flex: none; }
+  .histitem .status { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+  .status.warn { background: var(--danger-tint); color: var(--danger); }
+  .status.ok { background: var(--primary-tint); color: var(--primary-dark); }
+  .empty { text-align: center; padding: 50px 20px; color: var(--muted); font-size: 13.5px; }
+
+  /* ---- knowledge ---- */
+  .knowitem { display: flex; gap: 12px; align-items: center; padding: 14px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .knowitem .thumb { width: 44px; height: 44px; border-radius: 10px; background: var(--surface-2); color: var(--primary-dark); flex: none; display: flex; align-items: center; justify-content: center; }
+  .knowitem .name { font-size: 14px; font-weight: 600; }
+  .knowitem .cat { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .detailhero { margin: 16px 20px; aspect-ratio: 16/9; border-radius: var(--radius-l); background: var(--primary-tint); display: flex; align-items: center; justify-content: center; color: var(--primary-dark); }
+
+  /* ---- settings ---- */
+  .profilecard { margin: 6px 20px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 18px; display: flex; align-items: center; gap: 14px; }
+  .avatar { width: 54px; height: 54px; border-radius: 50%; background: var(--surface-2); color: var(--muted); display: flex; align-items: center; justify-content: center; flex: none; }
+  .profilecard .name { font-size: 15.5px; font-weight: 700; }
+  .profilecard .phone { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .listgroup { margin: 0 20px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); overflow: hidden; }
+  .listrow { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); cursor: pointer; background: none; border-left: none; border-right: none; border-top: none; width: 100%; text-align: left; color: var(--ink); font-size: 14px; font-family: inherit; }
+  .listrow:last-child { border-bottom: none; }
+  .listrow:hover { background: var(--surface-2); }
+  .listrow .ic { color: var(--ink-soft); flex: none; }
+  .listrow span { flex: 1; }
+  .listrow.danger { color: var(--danger); }
+  .listrow .chev { color: var(--muted); }
+
+  /* ---- guide ---- */
+  .guidestep { display: flex; gap: 14px; margin: 0 20px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 15px 16px; align-items: flex-start; }
+  .guidestep .num { width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; font-family: var(--font-head); }
+  .guidestep p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; }
+
+  .toast {
+    position: absolute; left: 20px; right: 20px; bottom: 90px; background: var(--ink); color: var(--bg);
+    padding: 12px 16px; border-radius: var(--radius-m); font-size: 13px; display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.2); z-index: 20; opacity: 0; transform: translateY(8px); transition: all .25s ease; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+<div class="stage"><div class="phone" id="phone"></div></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============ mock data ============ */
+var KNOWLEDGE = [
+  { id:'redrot', cat:'disease', name:'โรคแดงก้านอ้อย (Red rot)',
+    cause:'เกิดจากเชื้อรา Colletotrichum falcatum เข้าทำลายทางบาดแผลหรือรากอ้อย',
+    detail:'ลำต้นแสดงอาการเนื้อในเป็นสีแดงสลับขาว มีกลิ่นเหม็นเปรี้ยว ใบเหี่ยวจากยอดลงล่าง ระบาดรุนแรงในสภาพอากาศชื้นและฝนตกชุก',
+    prevent:['ใช้ท่อนพันธุ์ปลอดโรค','หลีกเลี่ยงแปลงที่มีน้ำขัง','ทำลายตออ้อยที่เป็นโรคทันทีหลังเก็บเกี่ยว'] },
+  { id:'whiteleaf', cat:'disease', name:'โรคใบขาว',
+    cause:'เกิดจากไฟโตพลาสมา แพร่กระจายผ่านเพลี้ยจักจั่นพาหะและท่อนพันธุ์ที่เป็นโรค',
+    detail:'ใบอ่อนมีสีขาวซีดหรือครีม แตกกอฝอยเป็นพุ่ม ต้นแคระแกร็นไม่สร้างผลผลิต หากพบต้องขุดทำลายทั้งกอ',
+    prevent:['ปลูกพันธุ์ต้านทาน','กำจัดเพลี้ยจักจั่นพาหะ','คัดท่อนพันธุ์จากแปลงปลอดโรคเท่านั้น'] },
+  { id:'smut', cat:'disease', name:'โรคแส้ดำ',
+    cause:'เกิดจากเชื้อรา Sporisorium scitamineum แพร่ทางลมและท่อนพันธุ์',
+    detail:'ยอดอ้อยงอกเป็นแส้สีดำยาว คลุมด้วยสปอร์ผงสีดำ ต้นที่เป็นโรครุนแรงจะแคระแกร็นและแตกหน่อมากผิดปกติ',
+    prevent:['แช่ท่อนพันธุ์ในน้ำร้อนก่อนปลูก','ตัดทำลายแส้ดำก่อนสปอร์แพร่กระจาย','ปลูกพันธุ์ต้านทานโรค'] },
+  { id:'borer', cat:'pest', name:'หนอนเจาะลำต้นอ้อย',
+    cause:'ตัวเต็มวัยเป็นผีเสื้อกลางคืน วางไข่บนใบแล้วหนอนเจาะไชเข้าลำต้น',
+    detail:'พบรูเจาะบนลำต้นและยอดแห้งตาย เมื่อผ่าลำต้นจะพบโพรงและมูลหนอน ทำให้น้ำหนักและคุณภาพน้ำอ้อยลดลง',
+    prevent:['ใช้แตนเบียนควบคุมทางชีวภาพ','ตัดและทำลายส่วนที่ถูกทำลาย','สำรวจแปลงสม่ำเสมอในช่วงอ้อยแตกกอ'] },
+  { id:'mealybug', cat:'pest', name:'เพลี้ยแป้งอ้อย',
+    cause:'แมลงปากดูดขนาดเล็ก มักซ่อนตัวตามกาบใบและข้อลำต้น',
+    detail:'ดูดน้ำเลี้ยงทำให้ต้นอ้อยแคระแกร็น ใบเหลือง มีราดำขึ้นตามคราบน้ำหวานที่แมลงขับถ่ายออกมา',
+    prevent:['ปล่อยแมลงหางหนีบหรือด้วงเต่าเป็นศัตรูธรรมชาติ','หลีกเลี่ยงการใช้ปุ๋ยไนโตรเจนมากเกินไป','ตัดใบแห้งที่เป็นแหล่งอาศัยทิ้ง'] },
+  { id:'prevent-general', cat:'prevention', name:'แนวทางป้องกันโรคและศัตรูพืชอ้อยเบื้องต้น',
+    cause:'การป้องกันที่ดีเริ่มจากท่อนพันธุ์และการจัดการแปลงที่เหมาะสม',
+    detail:'เลือกท่อนพันธุ์จากแหล่งปลอดโรค ปรับปรุงดินและการระบายน้ำ หมั่นสำรวจแปลงเป็นประจำ และกำจัดวัชพืชที่เป็นแหล่งอาศัยของแมลงพาหะ',
+    prevent:['ตรวจแปลงอย่างน้อยสัปดาห์ละครั้ง','หมุนเวียนปลูกพืชชนิดอื่นสลับ','บันทึกประวัติการระบาดของแต่ละแปลง'] }
+];
+
+var HISTORY_SEED = [
+  { date:'20 มิ.ย. 2568', name:'โรคแดงก้านอ้อย', status:'warn', photo:null },
+  { date:'18 มิ.ย. 2568', name:'หนอนเจาะลำต้นอ้อย', status:'warn', photo:null },
+  { date:'15 มิ.ย. 2568', name:'โรคใบขาว', status:'warn', photo:null },
+  { date:'12 มิ.ย. 2568', name:'ไม่พบความผิดปกติ', status:'ok', photo:null }
+];
+
+var GUIDE_STEPS = [
+  'ถ่ายภาพใบหรือลำต้นอ้อยที่สงสัยว่าเป็นโรค ให้เห็นบริเวณที่ผิดปกติชัดเจน',
+  'ระบบจะวิเคราะห์และแสดงผลภายในไม่กี่วินาที',
+  'ตรวจสอบผลลัพธ์และอ่านคำแนะนำการจัดการที่เหมาะสม',
+  'ปฏิบัติตามคำแนะนำเพื่อป้องกันและควบคุมโรคหรือศัตรูพืชอย่างทันท่วงที'
+];
+
+/* ============ icons ============ */
+var ICON = {
+  leaf:'<svg viewBox="0 0 24 24" fill="none"><path d="M5 19c8-1 12-6 13-13-8 0-13 4.5-13 13Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 18c2.5-3.5 5.5-6.5 11-11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  home:'<svg viewBox="0 0 24 24" fill="none"><path d="M4 11.5 12 4l8 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  history:'<svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 1 0 2.5-5.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 5v4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  book:'<svg viewBox="0 0 24 24" fill="none"><path d="M5 5.5C6.5 4.6 9 4 12 4.6V19c-3-.6-5.5 0-7 .9V5.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M19 5.5C17.5 4.6 15 4 12 4.6V19c3-.6 5.5 0 7 .9V5.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18 6l-1.6 1.6M7.6 16.4 6 18M18 18l-1.6-1.6M7.6 7.6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none"><path d="M15 5 8 12l7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  camera:'<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="18" height="13" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 7l1.4-2.4A1.5 1.5 0 0 1 10.7 4h2.6a1.5 1.5 0 0 1 1.3.7L16 7" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.4" stroke="currentColor" stroke-width="1.8"/></svg>',
+  gallery:'<svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 16l4.5-4.5 3 3 4-4 5.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="8" cy="9" r="1.4" fill="currentColor"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none"><path d="M12 4 3 20h18L12 4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10.5v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  bug:'<svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="13" rx="4.5" ry="6" stroke="currentColor" stroke-width="1.8"/><path d="M12 7V4M8.5 8l-2.5-2M15.5 8l2.5-2M6 13H3M21 13h-3M8.5 18l-2.5 2M15.5 18l2.5 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  user:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="9" r="3.2" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.3-3.5 4.2-5.3 7-5.3S18.7 16.5 20 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  bell:'<svg viewBox="0 0 24 24" fill="none"><path d="M6.5 10.5a5.5 5.5 0 1 1 11 0c0 4 1.5 5.2 1.5 5.2H5s1.5-1.2 1.5-5.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 18.5a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  globe:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.8"/><path d="M4 12h16M12 3.8c2.4 2.2 3.6 5.2 3.6 8.2s-1.2 6-3.6 8.2c-2.4-2.2-3.6-5.2-3.6-8.2S9.6 6 12 3.8Z" stroke="currentColor" stroke-width="1.8"/></svg>',
+  info:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="8" r="1" fill="currentColor"/></svg>',
+  logout:'<svg viewBox="0 0 24 24" fill="none"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M15 8l4 4-4 4M19 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+
+/* ============ state ============ */
+var state = {
+  phase: 'splash',       // splash | auth | app
+  authTab: 'login',
+  tab: 'home',
+  overlay: null,         // capture | analyzing | result | guide | knowledgeDetail | histDetail
+  user: null,
+  photoData: null,
+  lastResult: null,
+  knowCat: 'all',
+  knowQuery: '',
+  histQuery: '',
+  detailId: null,
+  history: HISTORY_SEED.slice()
+};
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function showToast(msg){
+  var t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(function(){ t.classList.remove('show'); }, 1800);
+}
+
+/* ============ screens ============ */
+function screenSplash(){
+  return (
+    '<div class="screen">' +
+      '<div class="splash">' +
+        '<div class="mark">' + ICON.leaf.replace('currentColor','var(--primary-dark)').replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="46" height="46"') + '</div>' +
+        '<h1>ตรวจสอบโรคและ<br>ศัตรูพืชอ้อย</h1>' +
+        '<p>ด้วยเทคโนโลยี AI เพื่อเกษตรกรไทย วิเคราะห์ผลได้ทันทีจากภาพถ่าย</p>' +
+        '<button class="btn btn-primary btn-block" id="splashBtn" style="max-width:260px">เริ่มต้นใช้งาน</button>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function bindSplash(){
+  document.getElementById('splashBtn').addEventListener('click', function(){ state.phase = 'auth'; render(); });
+}
+
+function screenAuth(){
+  var isLogin = state.authTab === 'login';
+  return (
+    '<div class="screen"><div class="scroll">' +
+      '<div class="authhead">' +
+        '<div class="mark">' + ICON.leaf.replace('currentColor','var(--primary-dark)').replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="32" height="32"') + '</div>' +
+        '<h1 style="font-size:19px">' + (isLogin ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก') + '</h1>' +
+      '</div>' +
+      '<form id="authForm" class="pad" style="padding-top:0" novalidate>' +
+        (isLogin ? '' :
+          '<div class="field" id="f-name"><label>ชื่อ-นามสกุล</label><input id="regName" type="text" placeholder="เช่น สมหมาย ใจดี"><div class="err">กรุณากรอกชื่อ-นามสกุล</div></div>'
+        ) +
+        '<div class="field" id="f-phone"><label>เบอร์โทรศัพท์ / อีเมล</label><input id="authPhone" type="text" placeholder="08X-XXX-XXXX"><div class="err">กรุณากรอกให้ถูกต้อง</div></div>' +
+        '<div class="field" id="f-pass"><label>รหัสผ่าน</label><input id="authPass" type="password" placeholder="อย่างน้อย 6 ตัวอักษร"><div class="err">รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร</div></div>' +
+        '<button type="submit" class="btn btn-primary btn-block" style="margin-top:6px">' + (isLogin ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก') + '</button>' +
+        '<div class="divider">หรือ</div>' +
+        '<button type="button" class="btn btn-outline btn-block" id="switchAuth">' + (isLogin ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ') + '</button>' +
+      '</form>' +
+    '</div></div>'
+  );
+}
+function bindAuth(){
+  document.getElementById('switchAuth').addEventListener('click', function(){
+    state.authTab = state.authTab === 'login' ? 'register' : 'login'; render();
+  });
+  document.getElementById('authForm').addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var isLogin = state.authTab === 'login';
+    var phoneEl = document.getElementById('authPhone'), passEl = document.getElementById('authPass'), nameEl = document.getElementById('regName');
+    var ok = true;
+    function setErr(id, bad){ var f = document.getElementById(id); if (f) f.classList.toggle('has-error', bad); }
+    var phoneOk = phoneEl.value.trim().length >= 6;
+    var passOk = passEl.value.length >= 6;
+    var nameOk = isLogin || (nameEl && nameEl.value.trim().length >= 2);
+    setErr('f-phone', !phoneOk); if(!phoneOk) ok = false;
+    setErr('f-pass', !passOk); if(!passOk) ok = false;
+    if (!isLogin) { setErr('f-name', !nameOk); if(!nameOk) ok = false; }
+    if (!ok) return;
+    state.user = { name: isLogin ? 'เกษตรกรไทย' : nameEl.value.trim(), phone: phoneEl.value.trim() };
+    state.phase = 'app'; state.tab = 'home';
+    render();
+  });
+}
+
+function appShell(innerHtml, opts){
+  opts = opts || {};
+  var tabs = [
+    { id:'home', label:'หน้าหลัก', icon: ICON.home },
+    { id:'history', label:'ประวัติ', icon: ICON.history },
+    { id:'knowledge', label:'ความรู้', icon: ICON.book },
+    { id:'settings', label:'ตั้งค่า', icon: ICON.gear }
+  ];
+  var tabbar = opts.hideTabbar ? '' : (
+    '<div class="tabbar">' + tabs.map(function(t){
+      return '<button data-tab="' + t.id + '" class="' + (state.tab===t.id?'active':'') + '">' + t.icon + '<span>' + t.label + '</span></button>';
+    }).join('') + '</div>'
+  );
+  return '<div class="screen">' + innerHtml + tabbar + '<div class="toast" id="toast"></div></div>';
+}
+
+/* ---- home ---- */
+function viewHome(){
+  return (
+    '<div class="scroll">' +
+      '<div class="greet"><div class="hi">สวัสดี</div><h1>' + esc(state.user.name) + '</h1></div>' +
+      '<div class="banner">' +
+        '<h3>ตรวจโรคและศัตรูพืชอ้อยได้ง่าย ๆ ด้วย AI</h3>' +
+        '<p>ถ่ายภาพเดียว รู้ผลทันที</p>' +
+        ICON.leaf.replace('<svg ', '<svg class="leaf" ').replace(/currentColor/g,'#fff') +
+      '</div>' +
+      '<div class="quickgrid">' +
+        '<button class="qcard" data-go="capture"><span class="ic">' + ICON.camera + '</span><span>ตรวจสอบจากภาพ</span></button>' +
+        '<button class="qcard" data-go="tab:history"><span class="ic">' + ICON.history + '</span><span>ประวัติการตรวจ</span></button>' +
+        '<button class="qcard" data-go="tab:knowledge"><span class="ic">' + ICON.book + '</span><span>ความรู้</span></button>' +
+        '<button class="qcard" data-go="tab:settings"><span class="ic">' + ICON.gear + '</span><span>ตั้งค่า</span></button>' +
+      '</div>' +
+      '<div class="sectionhead"><h3>ข่าวสารล่าสุด</h3></div>' +
+      '<div class="updatelist">' +
+        '<div class="updateitem" data-go="guide"><span class="dot"></span><span class="txt"><b>เริ่มต้นใช้งาน</b> — ดูวิธีตรวจโรคอ้อยด้วย AI ใน 4 ขั้นตอน</span>' + ICON.chev + '</div>' +
+        '<div class="updateitem" data-go="know:borer"><span class="dot"></span><span class="txt">พบการระบาดของ <b>หนอนเจาะลำต้นอ้อย</b> ในพื้นที่ภาคตะวันออกเฉียงเหนือ</span>' + ICON.chev + '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function bindHome(){
+  document.querySelectorAll('[data-go]').forEach(function(el){
+    el.addEventListener('click', function(){
+      var go = el.getAttribute('data-go');
+      if (go === 'capture') { state.overlay = 'capture'; state.photoData = null; }
+      else if (go === 'guide') { state.overlay = 'guide'; }
+      else if (go.indexOf('tab:') === 0) { state.tab = go.slice(4); state.overlay = null; }
+      else if (go.indexOf('know:') === 0) { state.detailId = go.slice(5); state.overlay = 'knowledgeDetail'; }
+      render();
+    });
+  });
+}
+
+/* ---- capture / analyzing / result ---- */
+function overlayCapture(){
+  return (
+    '<div class="screen">' +
+      '<div class="topbar left"><button class="iconbtn" id="backBtn">' + ICON.back + '</button><h2>ตรวจสอบจากภาพ</h2></div>' +
+      '<div class="scroll">' +
+        '<div class="guidebox">ถ่ายภาพใบหรือลำต้นอ้อยบริเวณที่สงสัยว่าเป็นโรคให้เห็นชัดเจน แสงสว่างเพียงพอ จะช่วยให้ผลวิเคราะห์แม่นยำขึ้น</div>' +
+        '<div class="capture-area" id="captureArea">' +
+          (state.photoData
+            ? '<img src="' + state.photoData + '" alt="ภาพที่เลือก">'
+            : '<div class="camicon">' + ICON.camera.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="30" height="30"') + '</div><p>ยังไม่มีภาพ — ถ่ายภาพหรือเลือกจากแกลเลอรี</p>') +
+        '</div>' +
+        '<div class="capture-actions">' +
+          '<div class="fileinput-wrap"><button type="button" class="btn btn-primary btn-block">' + ICON.camera + ' ถ่ายภาพ</button><input type="file" accept="image/*" capture="environment" id="camInput"></div>' +
+          '<div class="fileinput-wrap"><button type="button" class="btn btn-outline btn-block">' + ICON.gallery + ' เลือกจากแกลเลอรี</button><input type="file" accept="image/*" id="galInput"></div>' +
+          '<button type="button" class="btn btn-primary btn-block" id="analyzeBtn" ' + (state.photoData ? '' : 'disabled') + ' style="margin-top:6px">วิเคราะห์ภาพ</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function bindCapture(){
+  document.getElementById('backBtn').addEventListener('click', function(){ state.overlay = null; render(); });
+  function handleFile(input){
+    input.addEventListener('change', function(){
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(){ state.photoData = reader.result; render(); };
+      reader.readAsDataURL(file);
+    });
+  }
+  handleFile(document.getElementById('camInput'));
+  handleFile(document.getElementById('galInput'));
+  var analyzeBtn = document.getElementById('analyzeBtn');
+  analyzeBtn.addEventListener('click', function(){
+    if (!state.photoData) return;
+    state.overlay = 'analyzing';
+    render();
+    setTimeout(function(){
+      var found = KNOWLEDGE[0];
+      state.lastResult = { disease: found, confidence: 92.5, healthy:false };
+      state.history.unshift({ date: new Date().toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}), name: found.name, status:'warn', photo: state.photoData });
+      state.overlay = 'result';
+      render();
+    }, 1600);
+  });
+}
+function overlayAnalyzing(){
+  return (
+    '<div class="screen">' +
+      '<div class="topbar left"><h2 style="margin:0">กำลังวิเคราะห์</h2></div>' +
+      '<div class="analyzing"><div class="spinner"></div><h3 style="font-size:15px">กำลังวิเคราะห์ภาพของคุณ...</h3><p style="color:var(--muted);font-size:13px;margin-top:8px">ใช้เวลาไม่เกิน 10 วินาที</p></div>' +
+    '</div>'
+  );
+}
+function overlayResult(){
+  var r = state.lastResult, d = r.disease;
+  return (
+    '<div class="screen">' +
+      '<div class="topbar left"><button class="iconbtn" id="backBtn">' + ICON.back + '</button><h2>ผลการวิเคราะห์</h2></div>' +
+      '<div class="scroll">' +
+        (state.photoData ? '<div class="resultphoto"><img src="' + state.photoData + '"></div>' : '') +
+        '<div class="resultcard"><span class="ic">' + ICON.warn + '</span><div><h3>พบ: ' + esc(d.name) + '</h3><div class="conf">ความแม่นยำ <b>' + r.confidence + '%</b></div></div></div>' +
+        '<div class="detailblock"><h4>สาเหตุ</h4><p>' + esc(d.cause) + '</p></div>' +
+        '<div class="detailblock"><h4>รายละเอียดอาการ</h4><p>' + esc(d.detail) + '</p></div>' +
+        '<div class="taglist">' + d.prevent.map(function(p){ return '<span class="tag">' + esc(p) + '</span>'; }).join('') + '</div>' +
+        '<div class="pad" style="padding-top:0"><button class="btn btn-primary btn-block" id="doneBtn">เสร็จสิ้น — กลับหน้าหลัก</button></div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function bindResult(){
+  document.getElementById('backBtn').addEventListener('click', function(){ state.overlay = null; render(); });
+  document.getElementById('doneBtn').addEventListener('click', function(){
+    state.overlay = null; state.tab = 'home'; state.photoData = null;
+    showToast('บันทึกผลลงในประวัติการตรวจแล้ว');
+    render();
+  });
+}
+
+/* ---- history ---- */
+function filteredHistory(){
+  var q = state.histQuery.trim().toLowerCase();
+  if (!q) return state.history;
+  return state.history.filter(function(h){ return h.name.toLowerCase().indexOf(q) > -1; });
+}
+function viewHistory(){
+  var list = filteredHistory();
+  return (
+    '<div class="scroll">' +
+      '<div class="topbar left" style="padding-bottom:4px"><h2>ประวัติการตรวจ</h2></div>' +
+      '<div class="searchbar">' + ICON.search + '<input id="histSearch" placeholder="ค้นหา..." value="' + esc(state.histQuery) + '"></div>' +
+      '<div class="histlist">' + (list.length ? list.map(function(h,i){
+        return '<div class="histitem" data-idx="' + i + '">' +
+          '<div class="thumb">' + (h.photo ? '<img src="'+h.photo+'">' : ICON.leaf) + '</div>' +
+          '<div class="mid"><div class="name">' + esc(h.name) + '</div><div class="date">' + esc(h.date) + '</div></div>' +
+          '<span class="status ' + h.status + '">' + (h.status==='ok' ? 'ปกติ' : 'พบปัญหา') + '</span>' +
+        '</div>';
+      }).join('') : '<div class="empty">ไม่พบประวัติที่ตรงกับ “' + esc(state.histQuery) + '”</div>') + '</div>' +
+    '</div>'
+  );
+}
+function bindHistory(){
+  var search = document.getElementById('histSearch');
+  search.addEventListener('input', function(){
+    state.histQuery = search.value; render(true);
+    var el = document.getElementById('histSearch'); el.focus(); el.setSelectionRange(el.value.length, el.value.length);
+  });
+  document.querySelectorAll('.histitem').forEach(function(el){
+    el.addEventListener('click', function(){
+      var idx = Number(el.getAttribute('data-idx'));
+      var item = filteredHistory()[idx];
+      var match = KNOWLEDGE.filter(function(k){ return k.name === item.name; })[0];
+      if (match) { state.detailId = match.id; state.overlay = 'knowledgeDetail'; render(); }
+    });
+  });
+}
+
+/* ---- knowledge ---- */
+function filteredKnowledge(){
+  var q = state.knowQuery.trim().toLowerCase();
+  return KNOWLEDGE.filter(function(k){
+    var catOk = state.knowCat === 'all' || k.cat === state.knowCat;
+    var qOk = !q || k.name.toLowerCase().indexOf(q) > -1;
+    return catOk && qOk;
+  });
+}
+function viewKnowledge(){
+  var cats = [ {id:'all',label:'ทั้งหมด'}, {id:'disease',label:'โรค'}, {id:'pest',label:'ศัตรูพืช'}, {id:'prevention',label:'การป้องกัน'} ];
+  var list = filteredKnowledge();
+  return (
+    '<div class="scroll">' +
+      '<div class="topbar left" style="padding-bottom:4px"><h2>ความรู้</h2></div>' +
+      '<div class="searchbar">' + ICON.search + '<input id="knowSearch" placeholder="ค้นหาโรคหรือศัตรูพืช..." value="' + esc(state.knowQuery) + '"></div>' +
+      '<div class="chiprow">' + cats.map(function(c){ return '<button class="chip ' + (state.knowCat===c.id?'active':'') + '" data-cat="' + c.id + '">' + c.label + '</button>'; }).join('') + '</div>' +
+      '<div class="histlist">' + (list.length ? list.map(function(k){
+        return '<div class="knowitem" data-id="' + k.id + '"><span class="thumb">' + (k.cat==='pest'?ICON.bug:ICON.leaf) + '</span>' +
+          '<div><div class="name">' + esc(k.name) + '</div><div class="cat">' + (k.cat==='disease'?'โรค':k.cat==='pest'?'ศัตรูพืช':'การป้องกัน') + '</div></div></div>';
+      }).join('') : '<div class="empty">ไม่พบข้อมูลที่ตรงกับการค้นหา</div>') + '</div>' +
+    '</div>'
+  );
+}
+function bindKnowledge(){
+  var search = document.getElementById('knowSearch');
+  search.addEventListener('input', function(){
+    state.knowQuery = search.value; render(true);
+    var el = document.getElementById('knowSearch'); el.focus(); el.setSelectionRange(el.value.length, el.value.length);
+  });
+  document.querySelectorAll('.chip').forEach(function(el){
+    el.addEventListener('click', function(){ state.knowCat = el.getAttribute('data-cat'); render(); });
+  });
+  document.querySelectorAll('.knowitem').forEach(function(el){
+    el.addEventListener('click', function(){ state.detailId = el.getAttribute('data-id'); state.overlay = 'knowledgeDetail'; render(); });
+  });
+}
+function overlayKnowledgeDetail(){
+  var k = KNOWLEDGE.filter(function(x){ return x.id === state.detailId; })[0] || KNOWLEDGE[0];
+  return (
+    '<div class="screen">' +
+      '<div class="topbar left"><button class="iconbtn" id="backBtn">' + ICON.back + '</button><h2>รายละเอียด</h2></div>' +
+      '<div class="scroll">' +
+        '<div class="detailhero">' + (k.cat==='pest'?ICON.bug:ICON.leaf).replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="52" height="52"') + '</div>' +
+        '<div class="pad" style="padding-top:0">' +
+          '<h2 style="font-size:18px;margin-bottom:6px">' + esc(k.name) + '</h2>' +
+          '<div class="tag" style="display:inline-block;margin-bottom:16px">' + (k.cat==='disease'?'โรค':k.cat==='pest'?'ศัตรูพืช':'การป้องกัน') + '</div>' +
+          '<div class="detailblock" style="margin:0 0 14px"><h4>สาเหตุ</h4><p>' + esc(k.cause) + '</p></div>' +
+          '<div class="detailblock" style="margin:0 0 14px"><h4>ลักษณะอาการ</h4><p>' + esc(k.detail) + '</p></div>' +
+          '<h4 style="font-size:13.5px;color:var(--ink-soft);margin-bottom:8px">แนวทางป้องกัน / จัดการ</h4>' +
+          '<ul style="margin:0;padding-left:18px;color:var(--ink-soft);font-size:13.5px;line-height:1.9">' + k.prevent.map(function(p){ return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function bindKnowledgeDetail(){
+  document.getElementById('backBtn').addEventListener('click', function(){ state.overlay = null; render(); });
+}
+
+/* ---- settings ---- */
+function viewSettings(){
+  return (
+    '<div class="scroll">' +
+      '<div class="topbar left" style="padding-bottom:4px"><h2>ตั้งค่า</h2></div>' +
+      '<div class="profilecard"><span class="avatar">' + ICON.user + '</span><div><div class="name">' + esc(state.user.name) + '</div><div class="phone">' + esc(state.user.phone || '-') + '</div></div></div>' +
+      '<div class="listgroup">' +
+        '<button class="listrow" data-act="noop"><span class="ic">' + ICON.user + '</span><span>ข้อมูลส่วนตัว</span>' + ICON.chev + '</button>' +
+        '<button class="listrow" data-act="noop"><span class="ic">' + ICON.bell + '</span><span>การแจ้งเตือน</span>' + ICON.chev + '</button>' +
+        '<button class="listrow" data-act="noop"><span class="ic">' + ICON.globe + '</span><span>ภาษา</span>' + ICON.chev + '</button>' +
+      '</div>' +
+      '<div class="listgroup">' +
+        '<button class="listrow" data-act="guide"><span class="ic">' + ICON.info + '</span><span>วิธีใช้งาน / เกี่ยวกับแอป</span>' + ICON.chev + '</button>' +
+      '</div>' +
+      '<div class="listgroup">' +
+        '<button class="listrow danger" id="logoutBtn"><span class="ic">' + ICON.logout + '</span><span>ออกจากระบบ</span></button>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function bindSettings(){
+  document.querySelectorAll('[data-act="guide"]').forEach(function(el){ el.addEventListener('click', function(){ state.overlay = 'guide'; render(); }); });
+  document.querySelectorAll('[data-act="noop"]').forEach(function(el){ el.addEventListener('click', function(){ showToast('ฟีเจอร์นี้อยู่ระหว่างการพัฒนา'); }); });
+  document.getElementById('logoutBtn').addEventListener('click', function(){
+    state.phase = 'auth'; state.user = null; state.tab = 'home'; state.overlay = null; render();
+  });
+}
+
+/* ---- guide overlay ---- */
+function overlayGuide(){
+  return (
+    '<div class="screen">' +
+      '<div class="topbar left"><button class="iconbtn" id="backBtn">' + ICON.back + '</button><h2>คำแนะนำการใช้งาน</h2></div>' +
+      '<div class="scroll pad" style="padding-top:6px">' +
+        GUIDE_STEPS.map(function(s,i){ return '<div class="guidestep"><span class="num">' + (i+1) + '</span><p>' + esc(s) + '</p></div>'; }).join('') +
+        '<button class="btn btn-primary btn-block" id="guideDoneBtn" style="margin-top:8px">เริ่มใช้งาน</button>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function bindGuide(){
+  document.getElementById('backBtn').addEventListener('click', function(){ state.overlay = null; render(); });
+  document.getElementById('guideDoneBtn').addEventListener('click', function(){ state.overlay = null; render(); });
+}
+
+/* ============ root render ============ */
+function render(skipScroll){
+  var phone = document.getElementById('phone');
+  var html;
+
+  if (state.phase === 'splash') { html = screenSplash(); phone.innerHTML = html; bindSplash(); return; }
+  if (state.phase === 'auth') { html = screenAuth(); phone.innerHTML = html; bindAuth(); return; }
+
+  if (state.overlay === 'capture') { phone.innerHTML = overlayCapture(); bindCapture(); return; }
+  if (state.overlay === 'analyzing') { phone.innerHTML = overlayAnalyzing(); return; }
+  if (state.overlay === 'result') { phone.innerHTML = overlayResult(); bindResult(); return; }
+  if (state.overlay === 'guide') { phone.innerHTML = overlayGuide(); bindGuide(); return; }
+  if (state.overlay === 'knowledgeDetail') { phone.innerHTML = overlayKnowledgeDetail(); bindKnowledgeDetail(); return; }
+
+  var inner;
+  if (state.tab === 'home') inner = viewHome();
+  else if (state.tab === 'history') inner = viewHistory();
+  else if (state.tab === 'knowledge') inner = viewKnowledge();
+  else inner = viewSettings();
+
+  phone.innerHTML = appShell(inner);
+  document.querySelectorAll('.tabbar [data-tab]').forEach(function(el){
+    el.addEventListener('click', function(){ state.tab = el.getAttribute('data-tab'); render(); });
+  });
+  if (state.tab === 'home') bindHome();
+  else if (state.tab === 'history') bindHistory();
+  else if (state.tab === 'knowledge') bindKnowledge();
+  else bindSettings();
+
+  if (!skipScroll) {
+    var sc = phone.querySelector('.scroll'); if (sc) sc.scrollTop = 0;
+  }
+}
+
+render();
+})();
+</script>
+</body>
+</html>
